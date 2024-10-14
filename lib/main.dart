@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:object_owl/detect.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 void main() {
@@ -39,6 +40,7 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return const MaterialApp(
       debugShowCheckedModeBanner: false,
+      home: ObjectDetectionScreen(),
     );
   }
 }
