@@ -31,7 +31,8 @@ class _MyAppState extends State<MyApp> {
         msg: "App may malfunction without granted permissions",
         toastLength: Toast.LENGTH_SHORT,
         gravity: ToastGravity.BOTTOM,
-        timeInSecForIosWeb: 1
+        timeInSecForIosWeb: 1,
+        backgroundColor: Colors.red
       );
     }
   }
