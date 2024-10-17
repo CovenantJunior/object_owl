@@ -1,6 +1,11 @@
+import 'dart:async';
+import 'dart:io'; // Import for File
+import 'dart:ui' as ui; // Import for ui.Image
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:object_owl/services/camera.dart';
 import 'package:object_owl/services/tensor.dart';
+import 'package:image/image.dart' as img; // Import for image processing
 
 class ObjectDetectionScreen extends StatefulWidget {
   const ObjectDetectionScreen({super.key});
@@ -34,17 +39,37 @@ class _ObjectDetectionScreenState extends State<ObjectDetectionScreen> {
       if (_cameraService.controller != null &&
           _cameraService.controller!.value.isInitialized) {
         // Capture image from the camera
-        var image = await _cameraService.controller!.takePicture();
+        final XFile imageFile = await _cameraService.controller!.takePicture();
+
+        // Convert XFile to ui.Image
+        ui.Image image = await _loadImageFromFile(imageFile.path);
 
         // Run detection on the captured image
-        var objects = _detectionService.detectObjects();
+        var objects = await _detectionService.detectObjects(image);
 
         // Update state with detected objects
         setState(() {
-          _detectedObjects = objects;
+          _detectedObjects = objects; // Ensure this matches your function return type
         });
       }
+      await Future.delayed(const Duration(milliseconds: 100)); // Add delay to prevent continuous capture
     }
+  }
+
+  Future<ui.Image> _loadImageFromFile(String path) async {
+    // Load image from file
+    final data = await File(path).readAsBytes();
+    
+    // Decode the image to ensure it's in the right format
+    final image = img.decodeImage(data);
+    
+    // Convert the image to ui.Image
+    final completer = Completer<ui.Image>();
+    ui.decodeImageFromList(data, (result) {
+      completer.complete(result);
+    });
+
+    return completer.future;
   }
 
   @override
