@@ -37,15 +37,12 @@ class ObjectDetectionService {
     // Preprocess the image to fit the input shape expected by the model
     Uint8List inputImageBytes = await _preprocessImage(image);
 
-    // Decode the image using the image package
-    img.Image? decodedImage = img.decodeImage(inputImageBytes);
-    if (decodedImage == null) {
-      throw Exception('Failed to decode the image.');
-    }
-
-    // Resize image to match model input size (adjust this based on your model's expected input size)
-    img.Image resizedImage = img.copyResize(decodedImage,
-        width: _inputShape[1], height: _inputShape[2]);
+    // Instead of decoding, resize the image to match model input size
+    img.Image resizedImage = img.Image.fromBytes(
+      width: _inputShape[1], 
+      height: _inputShape[2], 
+      bytes: inputImageBytes,
+    );
 
     // Convert image to float32 format (as required by most TensorFlow Lite models)
     var input = _imageToFloat32List(resizedImage, _inputShape);
@@ -60,6 +57,7 @@ class ObjectDetectionService {
     // Process the output and return detected objects
     return _processOutput(output);
   }
+
 
   /// Helper method to process the raw output of the model into [DetectedObject]
   List<DetectedObject> _processOutput(List<List<double>> output) {

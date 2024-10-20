@@ -3,6 +3,7 @@ import 'dart:io'; // Import for File
 import 'dart:ui' as ui; // Import for ui.Image
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:object_owl/services/camera.dart';
 import 'package:object_owl/services/tensor.dart';
 import 'package:image/image.dart' as img; // Import for image processing
@@ -26,35 +27,49 @@ class _ObjectDetectionScreenState extends State<ObjectDetectionScreen> {
   }
 
   Future<void> _initializeServices() async {
-    // Initialize camera and object detection
-    await _cameraService.init();
+  // Initialize camera first
+  await _cameraService.init();
+
+  // Ensure the camera is initialized before loading the model
+  if (_cameraService.controller != null &&
+      _cameraService.controller!.value.isInitialized) {
     await _detectionService.loadModel();
-
-    // Start detecting objects in each frame
+    setState(() {
+      
+    });
     _startDetectionLoop();
+  } else {
+    Fluttertoast.showToast(
+      msg: "Camera initialization failed",
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: Colors.red,
+    );
   }
+}
 
-  void _startDetectionLoop() async {
-    while (mounted) {
-      if (_cameraService.controller != null &&
-          _cameraService.controller!.value.isInitialized) {
-        // Capture image from the camera
-        final XFile imageFile = await _cameraService.controller!.takePicture();
+void _startDetectionLoop() async {
+  while (mounted) {
+    if (_cameraService.controller != null &&
+        _cameraService.controller!.value.isInitialized) {
+      // Capture image from the camera
+      final XFile imageFile = await _cameraService.controller!.takePicture();
 
-        // Convert XFile to ui.Image
-        ui.Image image = await _loadImageFromFile(imageFile.path);
+      // Convert XFile to ui.Image
+      ui.Image image = await _loadImageFromFile(imageFile.path);
 
-        // Run detection on the captured image
-        var objects = await _detectionService.detectObjects(image);
+      // Run detection on the captured image
+      var objects = await _detectionService.detectObjects(image);
 
-        // Update state with detected objects
-        setState(() {
-          _detectedObjects = objects; // Ensure this matches your function return type
-        });
-      }
-      await Future.delayed(const Duration(milliseconds: 100)); // Add delay to prevent continuous capture
+      // Update state with detected objects
+      setState(() {
+        _detectedObjects = objects;
+      });
     }
+    await Future.delayed(const Duration(milliseconds: 100)); // Add delay
   }
+}
+
 
   Future<ui.Image> _loadImageFromFile(String path) async {
     // Load image from file
