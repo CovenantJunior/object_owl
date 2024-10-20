@@ -41,7 +41,7 @@ class ObjectDetectionService {
     img.Image resizedImage = img.Image.fromBytes(
       width: _inputShape[1], 
       height: _inputShape[2], 
-      bytes: inputImageBytes,
+      bytes: inputImageBytes.buffer,
     );
 
     // Convert image to float32 format (as required by most TensorFlow Lite models)
