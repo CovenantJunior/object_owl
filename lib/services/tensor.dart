@@ -37,6 +37,10 @@ class ObjectDetectionService {
     // Preprocess the image to fit the input shape expected by the model
     Uint8List inputImageBytes = await _preprocessImage(image);
 
+    print('Model Input Shape: $_inputShape');
+    print('Model Output Shape: $_outputShape');
+    print('Decoded Image: width = ${image.width}, height = ${image.height}');
+
     // Instead of decoding, resize the image to match model input size
     img.Image resizedImage = img.Image.fromBytes(
       width: _inputShape[1], 
@@ -65,16 +69,27 @@ class ObjectDetectionService {
 
     // Assume the output contains bounding box info and labels (adjust based on model output)
     for (var detection in output) {
-      // Extract bounding box coordinates and label from the output (example format)
-      double x = detection[0];
-      double y = detection[1];
-      double width = detection[2];
-      double height = detection[3];
-      String label = "Object"; // Replace with actual label mapping if available
+      // Log the entire detection to inspect its structure
+      print('Detection: $detection');
 
-      Rect boundingBox = Rect.fromLTWH(x, y, width, height);
-      detectedObjects.add(DetectedObject(boundingBox, label));
+      // Ensure the detection has at least 4 elements (x, y, width, height)
+      if (detection.length >= 4) {
+        // Safely extract bounding box values
+        double x = detection[0];
+        double y = detection[1];
+        double width = detection[2];
+        double height = detection[3];
+
+        // Create a bounding box and add the detected object
+        Rect boundingBox = Rect.fromLTWH(x, y, width, height);
+        detectedObjects.add(DetectedObject(boundingBox, "Object"));  // Adjust label as needed
+      } else {
+        // Log a message if detection is incomplete
+        print('Insufficient data in detection: $detection');
+      }
     }
+
+
 
     return detectedObjects;
   }
