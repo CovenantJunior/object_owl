@@ -18,7 +18,7 @@ class ObjectDetectionService {
 
   Future<void> loadModel() async {
     // Load the TensorFlow Lite model
-    _interpreter = await Interpreter.fromAsset('model.tflite');
+    _interpreter = await Interpreter.fromAsset('models/efficientdet-tensorflow2-d0-v1');
     _inputShape = _interpreter.getInputTensor(0).shape;
     _outputShape = _interpreter.getOutputTensor(0).shape;
   }
