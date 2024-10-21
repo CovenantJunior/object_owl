@@ -53,7 +53,7 @@ class ObjectDetectionService {
 
     // Prepare output buffer (match to your model's output shape)
     var output = List.generate(
-        _outputShape[1], (_) => List<double>.filled(_outputShape[2], 0.0));
+        _outputShape[1], (_) => List<double>.filled(_outputShape[1], 0.0));
 
     // Run inference
     _interpreter.run(input, output);
