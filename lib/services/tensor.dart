@@ -34,9 +34,8 @@ class ObjectDetectionService {
   }
 
   Future<List<DetectedObject>> detectObjects(ui.Image image) async {
-    // Preprocess the image to fit the input shape expected by the model
+    // Ensure the model is loaded
     Uint8List? inputImageBytes;
-
     try {
       inputImageBytes = await _preprocessImage(image);
     } catch (e) {
@@ -44,11 +43,7 @@ class ObjectDetectionService {
       return [];
     }
 
-    print('Model Input Shape: $_inputShape');
-    print('Model Output Shape: $_outputShape');
-    print('Decoded Image: width = ${image.width}, height = ${image.height}');
-
-    // Decode and resize the image
+    // Resize the image to match the model input
     img.Image? decodedImage = img.decodeImage(inputImageBytes);
     if (decodedImage == null) {
       print('Failed to decode image.');
@@ -57,20 +52,20 @@ class ObjectDetectionService {
 
     img.Image resizedImage = img.copyResize(
       decodedImage,
-      width: _inputShape[2], // 448
-      height: _inputShape[1], // 448
+      width: _inputShape[2], // Match model input width
+      height: _inputShape[1], // Match model input height
     );
 
-    // Convert the image to Float32List (normalized pixel values)
-    Float32List input = _imageToFloat32List(resizedImage);
+    Uint8List input = _imageToUint8List(resizedImage);
 
-    // Prepare output buffer (adjust size based on model output)
-    var output = List.generate(
-      _outputShape[1] * _outputShape[2], // Adjust according to model's output
-      (_) => 0.0,
-    );
+    var inputTensor = input.reshape([1, 448, 448, 3]); // Ensure 4D shape
 
-    // Run inference
+    // Prepare output buffer
+  var output = List<double>.filled(_outputShape[1] * _outputShape[2], 0.0); // 100 elements for [1, 25, 4]
+
+
+    _interpreter.run(inputTensor, output); // inputTensor should be 4D
+
     try {
       _interpreter.run(input, output);
     } catch (e) {
@@ -78,22 +73,21 @@ class ObjectDetectionService {
       return [];
     }
 
-    // Process the output and return detected objects
     return _processOutput(output);
   }
+
 
   /// Helper method to process the raw output of the model into [DetectedObject]
   List<DetectedObject> _processOutput(List<double> output) {
     List<DetectedObject> detectedObjects = [];
 
-    // Process each detection based on the expected output structure
+    // Assuming each detection has 4 values, loop through the output
     for (int i = 0; i < output.length; i += 4) {
-      // Assuming each detection has 4 values
       if (i + 3 < output.length) {
-        double x = output[i];
-        double y = output[i + 1];
-        double width = output[i + 2];
-        double height = output[i + 3];
+        double x = output[i]; // X coordinate
+        double y = output[i + 1]; // Y coordinate
+        double width = output[i + 2]; // Width of bounding box
+        double height = output[i + 3]; // Height of bounding box
 
         Rect boundingBox = Rect.fromLTWH(x, y, width, height);
         detectedObjects.add(
@@ -103,6 +97,7 @@ class ObjectDetectionService {
 
     return detectedObjects;
   }
+
 
   /// Helper method to convert an [img.Image] to a Float32List (normalized pixel values)
   Float32List _imageToFloat32List(img.Image image) {
@@ -118,6 +113,27 @@ class ObjectDetectionService {
         input[index++] = (pixel.r) / 255.0; // Red channel
         input[index++] = (pixel.g) / 255.0; // Green channel
         input[index++] = (pixel.b) / 255.0; // Blue channel
+      }
+    }
+
+    return input;
+  }
+
+  /// Helper method to convert an [img.Image] to a Uint8List (8-bit pixel values)
+  Uint8List _imageToUint8List(img.Image image) {
+    int width = image.width;
+    int height = image.height;
+
+    // Create a Uint8List for the image data
+    Uint8List input = Uint8List(width * height * 3); // 3 for RGB channels
+
+    int index = 0; // Track the index for the flat list
+    for (int y = 0; y < height; y++) {
+      for (int x = 0; x < width; x++) {
+        final pixel = image.getPixel(x, y);
+        input[index++] = pixel.r.toInt(); // Red channel
+        input[index++] = pixel.g.toInt(); // Green channel
+        input[index++] = pixel.b.toInt(); // Blue channel
       }
     }
 
