@@ -25,7 +25,7 @@ class CameraService {
       return;
     }
 
-    controller = CameraController(cameras![0], ResolutionPreset.ultraHigh);
+    controller = CameraController(cameras![1], ResolutionPreset.ultraHigh);
 
     try {
       // Await the controller initialization

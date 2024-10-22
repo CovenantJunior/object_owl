@@ -18,7 +18,7 @@ class ObjectDetectionService {
 
   Future<void> loadModel() async {
     // Load the TensorFlow Lite model
-    _interpreter = await Interpreter.fromAsset('models/model.tflite');
+    _interpreter = await Interpreter.fromAsset('models/object.tflite');
     _inputShape = _interpreter.getInputTensor(0).shape;
     _outputShape = _interpreter.getOutputTensor(0).shape;
   }
@@ -26,91 +26,98 @@ class ObjectDetectionService {
   /// Convert Flutter [ui.Image] to a Tensor-friendly format (Byte List)
   Future<Uint8List> _preprocessImage(ui.Image image) async {
     final ByteData? byteData =
-        await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+        await image.toByteData(format: ui.ImageByteFormat.png);
+
     if (byteData == null) throw Exception('Failed to convert image to bytes.');
 
     return byteData.buffer.asUint8List();
   }
 
-  /// Detect objects in the given image
   Future<List<DetectedObject>> detectObjects(ui.Image image) async {
     // Preprocess the image to fit the input shape expected by the model
-    Uint8List inputImageBytes = await _preprocessImage(image);
+    Uint8List? inputImageBytes;
+
+    try {
+      inputImageBytes = await _preprocessImage(image);
+    } catch (e) {
+      print('Error in image preprocessing: $e');
+      return [];
+    }
 
     print('Model Input Shape: $_inputShape');
     print('Model Output Shape: $_outputShape');
     print('Decoded Image: width = ${image.width}, height = ${image.height}');
 
-    // Instead of decoding, resize the image to match model input size
-    img.Image resizedImage = img.Image.fromBytes(
-      width: _inputShape[1], 
-      height: _inputShape[2], 
-      bytes: inputImageBytes.buffer,
+    // Decode and resize the image
+    img.Image? decodedImage = img.decodeImage(inputImageBytes);
+    if (decodedImage == null) {
+      print('Failed to decode image.');
+      return [];
+    }
+
+    img.Image resizedImage = img.copyResize(
+      decodedImage,
+      width: _inputShape[2], // 448
+      height: _inputShape[1], // 448
     );
 
-    // Convert image to float32 format (as required by most TensorFlow Lite models)
-    var input = _imageToFloat32List(resizedImage, _inputShape);
+    // Convert the image to Float32List (normalized pixel values)
+    Float32List input = _imageToFloat32List(resizedImage);
 
-    // Prepare output buffer (match to your model's output shape)
+    // Prepare output buffer (adjust size based on model output)
     var output = List.generate(
-        _outputShape[1], (_) => List<double>.filled(_outputShape[1], 0.0));
+      _outputShape[1] * _outputShape[2], // Adjust according to model's output
+      (_) => 0.0,
+    );
 
     // Run inference
-    _interpreter.run(input, output);
+    try {
+      _interpreter.run(input, output);
+    } catch (e) {
+      print('Error during model inference: $e');
+      return [];
+    }
 
     // Process the output and return detected objects
     return _processOutput(output);
   }
 
-
   /// Helper method to process the raw output of the model into [DetectedObject]
-  List<DetectedObject> _processOutput(List<List<double>> output) {
+  List<DetectedObject> _processOutput(List<double> output) {
     List<DetectedObject> detectedObjects = [];
 
-    // Assume the output contains bounding box info and labels (adjust based on model output)
-    for (var detection in output) {
-      // Log the entire detection to inspect its structure
-      print('Detection: $detection');
+    // Process each detection based on the expected output structure
+    for (int i = 0; i < output.length; i += 4) {
+      // Assuming each detection has 4 values
+      if (i + 3 < output.length) {
+        double x = output[i];
+        double y = output[i + 1];
+        double width = output[i + 2];
+        double height = output[i + 3];
 
-      // Ensure the detection has at least 4 elements (x, y, width, height)
-      if (detection.length >= 4) {
-        // Safely extract bounding box values
-        double x = detection[0];
-        double y = detection[1];
-        double width = detection[2];
-        double height = detection[3];
-
-        // Create a bounding box and add the detected object
         Rect boundingBox = Rect.fromLTWH(x, y, width, height);
-        detectedObjects.add(DetectedObject(boundingBox, "Object"));  // Adjust label as needed
-      } else {
-        // Log a message if detection is incomplete
-        print('Insufficient data in detection: $detection');
+        detectedObjects.add(
+            DetectedObject(boundingBox, "Object")); // Adjust label as needed
       }
     }
-
-
 
     return detectedObjects;
   }
 
   /// Helper method to convert an [img.Image] to a Float32List (normalized pixel values)
-  List<List<List<double>>> _imageToFloat32List(
-      img.Image image, List<int> inputShape) {
-    List<List<List<double>>> input = List.generate(
-      inputShape[1], // width
-      (_) => List.generate(
-        inputShape[2], // height
-        (_) => List.filled(3, 0.0), // RGB channels
-      ),
-    );
+  Float32List _imageToFloat32List(img.Image image) {
+    int width = image.width;
+    int height = image.height;
 
-    for (int y = 0; y < inputShape[1]; y++) {
-      for (int x = 0; x < inputShape[2]; x++) {
+    Float32List input = Float32List(width * height * 3);
+
+    int index = 0; // Track the index for the flat list
+    for (int y = 0; y < height; y++) {
+      for (int x = 0; x < width; x++) {
         final pixel = image.getPixel(x, y);
-        input[y][x][0] = (pixel.r) / 255.0; // Red channel
-        input[y][x][1] = (pixel.g) / 255.0; // Green channel
-        input[y][x][2] = (pixel.b) / 255.0; // Blue channel
+        input[index++] = (pixel.r) / 255.0; // Red channel
+        input[index++] = (pixel.g) / 255.0; // Green channel
+        input[index++] = (pixel.b) / 255.0; // Blue channel
       }
     }
 
